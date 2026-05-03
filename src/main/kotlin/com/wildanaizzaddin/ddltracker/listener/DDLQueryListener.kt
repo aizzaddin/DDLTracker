@@ -22,7 +22,7 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
         val sql = context.getStatementContext()?.sql ?: context.query
 
         // [DEBUG] Remove after confirmed working
-        notify("afterStatement fired: $sql", NotificationType.WARNING)
+        notify("[DDL Tracker] New activity tracked: $sql", NotificationType.WARNING)
 
         if (!DDLFilterService.isDDL(sql)) return
 
@@ -53,7 +53,7 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
                         notifyPushFailure(err)
                     }
             }.onFailure { err ->
-                LOG.error("DDL Tracker: unexpected error processing statement", err)
+                LOG.error("[DDL Tracker] unexpected error processing statement", err)
             }
         }
     }
@@ -66,8 +66,8 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
     }
 
     private fun notifySuccess(message: String, branch: String) =
-        notify("Committed to $branch\n$message", NotificationType.INFORMATION)
+        notify("[DDL Tracker] Committed to $branch\n$message", NotificationType.INFORMATION)
 
     private fun notifyPushFailure(err: Throwable) =
-        notify("Push failed — ${err.message}", NotificationType.WARNING)
+        notify("[DDL Tracker] Push failed — ${err.message}", NotificationType.WARNING)
 }

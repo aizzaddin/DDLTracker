@@ -15,7 +15,7 @@ class DDLTrackerPlugin : StartupActivity.DumbAware {
         // [DEBUG] Remove after confirmed working
         NotificationGroupManager.getInstance()
             .getNotificationGroup("DDL Tracker")
-            .createNotification("DDL Tracker: startup OK — listening for DDL", NotificationType.INFORMATION)
+            .createNotification("[DDL Tracker] Startup OK — listening for DDL", NotificationType.INFORMATION)
             .notify(project)
     }
 }
