@@ -1,0 +1,39 @@
+<idea-plugin>
+    <id>com.wildanaizzaddin.ddl-tracker</id>
+    <name>DDL Change Tracker</name>
+    <version>1.0.0</version>
+    <vendor email="hai@wildanaizzaddin.com">wildanaizzaddin</vendor>
+
+    <description><![CDATA[
+        Automatically intercepts DDL statements executed in the IDE database console,
+        writes them as .sql files, and commits them to a shared Git repository for
+        full team-wide audit trail of database schema changes.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.database</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity
+            implementation="com.wildanaizzaddin.ddltracker.DDLTrackerPlugin"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.wildanaizzaddin.ddltracker.settings.DDLTrackerSettingsUI"
+            id="com.wildanaizzaddin.ddltracker.settings"
+            displayName="DDL Change Tracker"/>
+
+        <applicationService
+            serviceImplementation="com.wildanaizzaddin.ddltracker.settings.DDLTrackerSettings"/>
+
+        <toolWindow
+            id="DDL Tracker"
+            anchor="bottom"
+            factoryClass="com.wildanaizzaddin.ddltracker.ui.DDLTrackerToolWindowFactory"
+            canCloseContents="false"/>
+
+        <notificationGroup
+            id="DDL Tracker"
+            displayType="BALLOON"/>
+    </extensions>
+</idea-plugin>
