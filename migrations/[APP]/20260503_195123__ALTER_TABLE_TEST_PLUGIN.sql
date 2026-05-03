@@ -4,4 +4,4 @@
 -- Datasource : DB App
 -- Schema     : [APP]
 
-alter table test_plugin drop column version
+alter table test_plugin drop column user_account_id
