@@ -52,7 +52,7 @@ Open **Settings → Tools → DDL Change Tracker**.
 Click **Refresh** next to the datasource list to reload connections from the current project's Database panel.
 
 ### ⚠️ Branch must match before using the plugin
-
+![DDL Tracker Setup](./img/DDL%20Tracker%20Setup.png)
 The plugin commits to whichever branch the Git repository is **currently checked out to** — it does not switch branches automatically. The **Active branch** field is used only for display (notifications, commit status). If the repo is on the wrong branch, DDL changes will land there instead.
 
 **Before you start tracking, verify the repo is on the correct branch:**
