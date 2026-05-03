@@ -1,261 +1,166 @@
-# DDL Change Tracker — IntelliJ/DataGrip Plugin Requirements
+# DDL Change Tracker
 
-## Overview
-
-An IntelliJ Platform plugin that automatically intercepts DDL statements executed by any user in IntelliJ IDEA or DataGrip, formats them, writes them as `.sql` files, and commits them to a shared Git repository. The goal is to provide a full audit trail of database structural changes across the team.
+An IntelliJ Platform plugin that automatically intercepts DDL statements executed in the IDE database console, writes them as `.sql` files, and commits them to a Git repository — giving your team a full audit trail of every database schema change.
 
 ---
 
-## Target Environment
+## Requirements
 
-- **IDE**: IntelliJ IDEA and/or DataGrip (IntelliJ Platform SDK)
-- **Language**: Kotlin + Gradle (IntelliJ Plugin conventions)
-- **Target Database**: Oracle
-- **Git Library**: JGit (no dependency on system `git` binary)
-- **Git Strategy**: Shared remote repository, `pull --rebase` before each push to handle multi-user concurrency
+| | |
+|---|---|
+| **IDE** | IntelliJ IDEA Ultimate 2024.1+ or DataGrip 2024.1+ |
+| **JVM** | 17 |
+| **Git repository** | A local Git repo (with optional remote) dedicated to DDL tracking |
+
+> The plugin requires the **DatabaseTools** plugin (`com.intellij.database`), which is bundled in IDEA Ultimate and DataGrip. It does **not** work in IntelliJ IDEA Community.
 
 ---
 
-## Functional Requirements
+## Build
 
-### FR-01 — DDL Interception
+```bash
+./gradlew buildPlugin
+```
 
-- The plugin MUST intercept all SQL statements executed via the IDE's database console or query runner
-- Only DDL statements MUST be captured; DML (INSERT, UPDATE, DELETE) and SELECT MUST be ignored
-- DDL keywords to capture (Oracle dialect):
-    - `CREATE TABLE`, `CREATE INDEX`, `CREATE SEQUENCE`, `CREATE VIEW`, `CREATE SYNONYM`
-    - `CREATE OR REPLACE` (procedure, function, trigger, package)
-    - `ALTER TABLE`, `ALTER INDEX`
-    - `DROP TABLE`, `DROP INDEX`, `DROP SEQUENCE`, `DROP VIEW`
-    - `RENAME`
-    - `TRUNCATE TABLE`
-- Interception MUST work for both single-statement and multi-statement script executions
-- Each DDL statement MUST be captured as an individual change record
+Output: `build/distributions/DDLTrack-1.0.0.zip`
 
-### FR-02 — Change Record
+---
 
-Each captured DDL change MUST produce a record containing:
+## Installation
+
+1. Open **Settings → Plugins**
+2. Click the gear icon → **Install Plugin from Disk…**
+3. Select `DDLTrack-1.0.0.zip`
+4. Restart the IDE when prompted
+
+---
+
+## Setup
+
+Open **Settings → Tools → DDL Change Tracker**.
 
 | Field | Description |
 |---|---|
-| `sql` | The raw DDL SQL (trimmed, normalized whitespace) |
-| `timestamp` | Local `LocalDateTime` at time of execution |
-| `user` | OS username (`System.getProperty("user.name")`) |
-| `datasource` | Name of the datasource/connection as configured in the IDE |
-| `schema` | Schema name extracted from the SQL or from the active connection |
-| `objectName` | Table/index/sequence name extracted from the SQL |
-| `actionType` | e.g., `CREATE_TABLE`, `ALTER_TABLE`, `DROP_INDEX` |
+| **Git repository path** | Absolute path to your local DDL tracking repo (must contain a `.git` folder) |
+| **Remote URL** | Remote URL for push (HTTPS or SSH). Leave blank to commit locally only |
+| **Active branch** | Branch to commit DDL changes to (e.g. `main`, `feature/sprint-42`) |
+| **Auto-commit on DDL** | Automatically stage and commit each DDL change as it happens (default: on) |
+| **Auto-push after commit** | Push to remote after every commit (default: off) |
+| **Excluded schemas** | Comma-separated schema names to ignore (default: `SYS,SYSTEM,DBSNMP`) |
+| **Tracked datasources** | Check the datasources you want to track. Leave all unchecked to track every datasource |
 
-### FR-03 — File Writer
+Click **Refresh** next to the datasource list to reload connections from the current project's Database panel.
 
-- Each DDL change MUST be written to a `.sql` file before committing
-- File path pattern:
-  ```
-  {git_repo_root}/migrations/{schema}/{yyyyMMdd_HHmmss}__{ACTION_TYPE}_{OBJECT_NAME}.sql
-  ```
-  Example: `migrations/HR/20260503_142200__ALTER_TABLE_EMPLOYEES.sql`
-- File MUST include a header comment block:
-  ```sql
-  -- DDL Change Tracker
-  -- Timestamp  : 2026-05-03T14:22:00
-  -- User       : wildan
-  -- Datasource : ORACLE_DEV
-  -- Schema     : HR
-  
-  ALTER TABLE HR.EMPLOYEES ADD (DEPT_ID NUMBER(10));
-  ```
-- Directories MUST be created automatically if they do not exist
+### ⚠️ Branch must match before using the plugin
 
-### FR-04 — Git Commit
+The plugin commits to whichever branch the Git repository is **currently checked out to** — it does not switch branches automatically. The **Active branch** field is used only for display (notifications, commit status). If the repo is on the wrong branch, DDL changes will land there instead.
 
-- After writing the file, the plugin MUST stage and commit it using JGit
-- Commit message format:
-  ```
-  [ALTER TABLE] HR.EMPLOYEES — wildan @ 2026-05-03T14:22:00
-  ```
-- Git author MUST use the OS username and a placeholder email: `{username}@local`
-- If a remote is configured, the plugin MUST:
-    1. `pull --rebase` before pushing
-    2. Retry up to 3 times with exponential backoff (500ms, 1000ms, 2000ms) on `TransportException`
-    3. If rebase conflict occurs (unlikely given unique filenames): abort rebase, retain the local `.sql` file, and notify the user via IDE notification
-    4. If all retries fail: save the file locally and notify the user that push failed
+**Before you start tracking, verify the repo is on the correct branch:**
 
-### FR-05 — Branch Selection
+```bash
+# Check current branch
+git -C /path/to/ddl-repo branch --show-current
 
-- The plugin MUST allow the user to select the active Git branch per datasource/connection
-- Branch name convention: matches the ongoing project name (e.g., `feature/approval-batch-phase2`)
-- On plugin startup or first DDL capture, if no branch is configured, the plugin MUST prompt the user to select or enter a branch name
-- The plugin MUST be able to:
-    - List existing local and remote branches from the configured repository
-    - Checkout an existing branch
-    - Create and checkout a new branch (from `main`/`master` by default)
-- Branch selection MUST be persisted per datasource in plugin settings
+# Switch to the target branch if it already exists
+git -C /path/to/ddl-repo checkout main
 
-### FR-06 — Settings UI
+# Or create and switch to a new branch
+git -C /path/to/ddl-repo checkout -b feature/sprint-42
+```
 
-The plugin MUST provide a Settings panel under **Settings → Tools → DDL Change Tracker** with the following fields:
+Make sure the branch shown by `branch --show-current` matches exactly what you typed in the **Active branch** field in settings. Do this every time you change the configured branch.
 
-| Field | Type | Description |
-|---|---|---|
-| Git Repository Path | Text field + Browse button | Absolute path to local Git repo directory |
-| Remote URL | Text field | Optional. Remote repo URL (HTTPS or SSH) |
-| Active Branch | Dropdown + New Branch button | Select or create branch; list fetched from repo |
-| Auto-commit on DDL | Toggle (default: ON) | Disable to queue changes without committing |
-| Auto-push after commit | Toggle (default: OFF) | Automatically push after each commit |
-| Track all datasources | Toggle (default: ON) | OFF = only track selected datasources |
-| Excluded schemas | Text field (comma-separated) | e.g., `SYS,SYSTEM,DBSNMP` |
+### Minimal setup (local only)
 
-Settings MUST be persisted using IntelliJ's `PersistentStateComponent` (stored in `ddl-tracker.xml`).
-
-A **Test Connection** button MUST verify that:
-- The given path contains a valid Git repository (`.git` directory exists)
-- The selected branch exists or can be created
-
-### FR-07 — Tool Window
-
-- The plugin MUST provide a Tool Window panel (anchored at the bottom, labeled **DDL Tracker**)
-- The Tool Window MUST display a table/list of recent DDL changes in the current session with columns:
-    - Timestamp
-    - User
-    - Datasource
-    - Schema
-    - Action Type
-    - Object Name
-    - Commit Status (Committed / Pending / Failed)
-- Clicking a row MUST show the full SQL in a preview pane below the table
-- A **View in Git Log** button MUST open the IDE's built-in VCS log filtered to the DDL tracker repo path (if possible)
-- A **Retry Push** button MUST be available for entries with `Failed` status
-
-### FR-08 — Notifications
-
-- On successful commit: show a balloon notification with commit message and branch name
-- On push failure: show a sticky notification with error details and a **Retry** action
-- On rebase conflict: show a sticky notification with instructions to resolve manually
-- All notifications MUST use IntelliJ's `NotificationGroupManager` API
+1. Create a Git repo: `git init ~/ddl-audit && cd ~/ddl-audit && git commit --allow-empty -m "init"`
+2. Set **Git repository path** to `~/ddl-audit`
+3. Enable **Auto-commit on DDL**
+4. Click **OK**
 
 ---
 
-## Non-Functional Requirements
+## Usage
 
-### NFR-01 — Performance
+Run any DDL statement in the database console as you normally would. The plugin:
 
-- DDL interception and file write MUST complete within 500ms
-- Git commit MUST be executed on a background thread (not the EDT) using `ApplicationManager.getApplication().executeOnPooledThread()`
-- Push (if enabled) MUST NOT block the IDE UI
+1. Detects the DDL and extracts schema, object name, and action type
+2. Writes a `.sql` file under `migrations/{SCHEMA}/`
+3. Commits it to the configured branch (if auto-commit is on)
+4. Pushes to remote with `pull --rebase` before push, retrying up to 3 times (if auto-push is on)
 
-### NFR-02 — Compatibility
+### Tool Window
 
-- Plugin MUST be compatible with IntelliJ IDEA 2023.3+ and DataGrip 2023.3+
-- IntelliJ Platform SDK version: `2024.1`
-- Java/Kotlin target: JVM 17
-- DatabaseTools plugin dependency MUST be declared in `plugin.xml`
+The **DDL Tracker** panel at the bottom of the IDE shows every change captured in the current session:
 
-### NFR-03 — Error Handling
+| Column | Description |
+|---|---|
+| Timestamp | When the statement was executed |
+| User | OS username |
+| Datasource | Connection name as configured in the IDE |
+| Schema | Target schema |
+| Action Type | e.g. `CREATE_TABLE`, `ALTER_TABLE`, `DROP_INDEX` |
+| Object | Object name |
+| Status | `PENDING` / `COMMITTED` / `FAILED` |
 
-- All Git operations MUST be wrapped in try-catch
-- File I/O failures MUST be logged and surfaced to the user via notification
-- The plugin MUST NOT throw uncaught exceptions that crash the IDE
-- If `QueryExecutionListener` API is not available (e.g., non-DB IDE), the plugin MUST degrade gracefully
-
-### NFR-04 — Security
-
-- No credentials or passwords MUST be stored in plugin settings
-- SSH key authentication and HTTPS token-based auth MUST be supported via the system's default Git credential store (JGit `CredentialsProvider` delegates to OS keychain)
-- The plugin MUST NOT log SQL content at INFO level; use DEBUG only
+Click any row to see the full SQL in the preview pane below.
 
 ---
 
-## Project Structure
+## Tracked DDL statements
 
-```
-ddl-tracker-plugin/
-├── build.gradle.kts
-├── settings.gradle.kts
-├── plugin.xml
-└── src/
-    └── main/
-        └── kotlin/
-            └── com/yourorg/ddltracker/
-                ├── DDLTrackerPlugin.kt             # PostStartupActivity entry point
-                ├── model/
-                │   └── DDLChange.kt                # data class
-                ├── listener/
-                │   └── DDLQueryListener.kt         # QueryExecutionListener impl
-                ├── service/
-                │   ├── DDLFilterService.kt         # DDL detection + object name extraction
-                │   ├── FileWriterService.kt        # .sql file writer
-                │   └── GitCommitService.kt         # JGit wrapper (commit + push + rebase)
-                ├── settings/
-                │   ├── DDLTrackerSettings.kt       # PersistentStateComponent
-                │   └── DDLTrackerSettingsUI.kt     # Settings panel (Swing/MigLayout)
-                └── ui/
-                    ├── DDLTrackerToolWindowFactory.kt
-                    └── DDLTrackerToolWindow.kt     # Table + SQL preview
-```
+| Statement | Action type |
+|---|---|
+| `CREATE TABLE` | `CREATE_TABLE` |
+| `CREATE INDEX` | `CREATE_INDEX` |
+| `CREATE VIEW` | `CREATE_VIEW` |
+| `CREATE SEQUENCE` | `CREATE_SEQUENCE` |
+| `CREATE SYNONYM` | `CREATE_SYNONYM` |
+| `CREATE OR REPLACE …` | `CREATE_OR_REPLACE` |
+| `ALTER TABLE` | `ALTER_TABLE` |
+| `ALTER INDEX` | `ALTER_INDEX` |
+| `DROP TABLE` | `DROP_TABLE` |
+| `DROP INDEX` | `DROP_INDEX` |
+| `DROP VIEW` | `DROP_VIEW` |
+| `DROP SEQUENCE` | `DROP_SEQUENCE` |
+| `TRUNCATE TABLE` | `TRUNCATE_TABLE` |
+| `RENAME` | `RENAME` |
+
+DML (`INSERT`, `UPDATE`, `DELETE`) and `SELECT` are ignored.
 
 ---
 
-## Dependencies (`build.gradle.kts`)
+## Output format
 
-```kotlin
-plugins {
-    id("org.jetbrains.intellij") version "1.17.0"
-    kotlin("jvm") version "1.9.22"
-}
-
-intellij {
-    version.set("2024.1")
-    type.set("IC")
-    plugins.set(listOf("DatabaseTools"))
-}
-
-dependencies {
-    implementation("org.eclipse.jgit:org.eclipse.jgit:6.8.0.202311291450-r")
-}
-```
-
----
-
-## `plugin.xml` Registration
-
-```xml
-<idea-plugin>
-    <id>com.yourorg.ddl-tracker</id>
-    <name>DDL Change Tracker</name>
-    <version>1.0.0</version>
-
-    <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.database</depends>
-
-    <extensions defaultExtensionNs="com.intellij">
-        <postStartupActivity
-            implementation="com.yourorg.ddltracker.DDLTrackerPlugin"/>
-
-        <applicationConfigurable
-            parentId="tools"
-            instance="com.yourorg.ddltracker.settings.DDLTrackerSettingsUI"
-            id="com.yourorg.ddltracker.settings"
-            displayName="DDL Change Tracker"/>
-
-        <applicationService
-            serviceImplementation="com.yourorg.ddltracker.settings.DDLTrackerSettings"/>
-
-        <toolWindow
-            id="DDL Tracker"
-            anchor="bottom"
-            factoryClass="com.yourorg.ddltracker.ui.DDLTrackerToolWindowFactory"
-            icon="/icons/ddl-tracker.svg"/>
-    </extensions>
-</idea-plugin>
-```
-
----
-
-## Git Repository Structure (Output)
+### File path
 
 ```
-{git_repo_root}/
-├── .git/
+{repo_root}/migrations/{SCHEMA}/{yyyyMMdd_HHmmss}__{ACTION_TYPE}_{OBJECT}.sql
+```
+
+Example: `migrations/HR/20260503_142200__ALTER_TABLE_EMPLOYEES.sql`
+
+### File content
+
+```sql
+-- DDL Change Tracker
+-- Timestamp  : 2026-05-03T14:22:00
+-- User       : wildan
+-- Datasource : ORACLE_DEV
+-- Schema     : HR
+
+ALTER TABLE HR.EMPLOYEES ADD (DEPT_ID NUMBER(10));
+```
+
+### Commit message
+
+```
+[ALTER TABLE] HR.EMPLOYEES — wildan @ 2026-05-03T14:22:00
+```
+
+### Repository layout
+
+```
+ddl-audit/
 └── migrations/
     ├── HR/
     │   ├── 20260503_142200__ALTER_TABLE_EMPLOYEES.sql
@@ -268,11 +173,40 @@ dependencies {
 
 ---
 
-## Out of Scope (v1)
+## Project structure
 
-- DML tracking (INSERT/UPDATE/DELETE)
-- Schema diffing / reverse engineering from Oracle Data Dictionary
-- Rollback/undo DDL generation
-- Flyway/Liquibase migration file format output
-- Web dashboard for audit log
-- Slack/Teams notification integration
+```
+DDLTrack/
+├── build.gradle.kts
+├── settings.gradle.kts
+├── gradle.properties
+└── src/main/
+    ├── kotlin/com/wildanaizzaddin/ddltracker/
+    │   ├── DDLTrackerPlugin.kt                 # StartupActivity — registers DataAuditor
+    │   ├── listener/
+    │   │   └── DDLQueryListener.kt             # DataAuditor — fires after each SQL statement
+    │   ├── model/
+    │   │   └── DDLChange.kt                    # Change record data class
+    │   ├── service/
+    │   │   ├── DDLFilterService.kt             # DDL detection and parsing
+    │   │   ├── FileWriterService.kt            # Writes .sql files with header comment
+    │   │   └── GitCommitService.kt             # JGit commit + pull-rebase + push
+    │   ├── settings/
+    │   │   ├── DDLTrackerSettings.kt           # PersistentStateComponent (app-level)
+    │   │   └── DDLTrackerSettingsUI.kt         # Settings panel (projectConfigurable)
+    │   └── ui/
+    │       ├── DDLTrackerToolWindowFactory.kt
+    │       └── DDLTrackerToolWindow.kt         # Table + SQL preview pane
+    └── resources/META-INF/
+        └── plugin.xml
+```
+
+---
+
+## Notes
+
+- Git operations run on a background thread — the IDE is never blocked.
+- The plugin uses **JGit** (no dependency on a system `git` binary).
+- Settings are stored in `ddl-tracker.xml` under the application config directory.
+- Schema filtering (`Excluded schemas`) is case-insensitive.
+- Datasource filtering: if no datasources are checked, all datasources are tracked.
