@@ -21,19 +21,22 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
     override fun afterStatement(context: DataRequest.Context) {
         val sql = context.getStatementContext()?.sql ?: context.query
 
-        // [DEBUG] Remove after confirmed working
-        notify("[DDL Tracker] New activity tracked: $sql", NotificationType.WARNING)
-
         if (!DDLFilterService.isDDL(sql)) return
 
         val settings = DDLTrackerSettings.getInstance()
-        val datasource = context.request.owner.getDisplayName()
+        val datasource = resolveDatasourceName(context)
         val activeSchema = context.searchPath?.getDisplayName() ?: ""
+
+        // [DEBUG] Remove after confirmed working
+        notify("[DDL Tracker] DDL detected | datasource: \"$datasource\" | schema: \"$activeSchema\"", NotificationType.WARNING)
 
         val tracked = settings.state.trackedDatasources
         if (tracked.isNotBlank()) {
-            val trackedList = tracked.split(',').map { it.trim() }
-            if (datasource !in trackedList) return
+            val trackedList = tracked.split(',').map { it.trim().lowercase() }
+            if (datasource.lowercase() !in trackedList) {
+                notify("[DDL Tracker] Skipped — \"$datasource\" not in tracked list: $tracked", NotificationType.WARNING)
+                return
+            }
         }
 
         val excluded = settings.state.excludedSchemas.split(',').map { it.trim().uppercase() }
@@ -42,7 +45,14 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
 
         DDLTrackerToolWindow.addChange(project, change)
 
-        if (!settings.state.autoCommit || settings.state.repoPath.isBlank()) return
+        if (!settings.state.autoCommit) {
+            notify("[DDL Tracker] Captured (auto-commit is off)", NotificationType.INFORMATION)
+            return
+        }
+        if (settings.state.repoPath.isBlank()) {
+            notify("[DDL Tracker] Captured — set a repo path in settings to enable auto-commit", NotificationType.WARNING)
+            return
+        }
 
         ApplicationManager.getApplication().executeOnPooledThread {
             runCatching {
@@ -62,6 +72,54 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
                 LOG.error("[DDL Tracker] unexpected error processing statement", err)
             }
         }
+    }
+
+    private fun resolveDatasourceName(context: DataRequest.Context): String {
+        val owner = context.request.owner
+
+        fun Any.call0(name: String): Any? =
+            runCatching { javaClass.getMethod(name).invoke(this) }.getOrNull()
+                ?: runCatching {
+                    javaClass.getDeclaredMethod(name).also { it.isAccessible = true }.invoke(this)
+                }.getOrNull()
+
+        fun Any.nameOrNull(): String? =
+            (call0("getName") as? String)?.takeIf { it.isNotBlank() }
+
+        // Path 1: getDataSource().getName()
+        owner.call0("getDataSource")?.nameOrNull()?.let { return it }
+
+        // Path 2: getConnectionPoint().getDataSource().getName()
+        owner.call0("getConnectionPoint")
+            ?.call0("getDataSource")
+            ?.nameOrNull()?.let { return it }
+
+        // Path 3: getSession().getConnectionPoint().getDataSource().getName()
+        owner.call0("getSession")
+            ?.call0("getConnectionPoint")
+            ?.call0("getDataSource")
+            ?.nameOrNull()?.let { return it }
+
+        // Path 4: getLocalDataSource().getName()
+        owner.call0("getLocalDataSource")?.nameOrNull()?.let { return it }
+
+        // Path 5: getClient().getConnectionPoint().getDataSource().getName()
+        owner.call0("getClient")
+            ?.call0("getConnectionPoint")
+            ?.call0("getDataSource")
+            ?.nameOrNull()?.let { return it }
+
+        // Fallback — log public + declared methods with return types so we can identify the right path
+        val pub = owner.javaClass.methods
+            .filter { it.parameterCount == 0 }
+            .map { "${it.name}→${it.returnType.simpleName}" }
+            .sorted()
+        val decl = owner.javaClass.declaredMethods
+            .filter { it.parameterCount == 0 }
+            .map { "${it.name}→${it.returnType.simpleName}" }
+            .sorted()
+        LOG.warn("[DDL Tracker] resolveDatasourceName fallback\n  class : ${owner.javaClass.name}\n  public: $pub\n  decl  : $decl")
+        return owner.getDisplayName()
     }
 
     private fun notify(msg: String, type: NotificationType) {
