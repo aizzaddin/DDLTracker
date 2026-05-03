@@ -1,4 +1,5 @@
 # DDL Change Tracker
+![Plugin Sample](./img/Plugin%20View.png)
 
 An IntelliJ Platform plugin that automatically intercepts DDL statements executed in the IDE database console, writes them as `.sql` files, and commits them to a Git repository — giving your team a full audit trail of every database schema change.
 
