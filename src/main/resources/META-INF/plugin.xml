@@ -26,6 +26,9 @@
         <applicationService
             serviceImplementation="com.wildanaizzaddin.ddltracker.settings.DDLTrackerSettings"/>
 
+        <projectService
+            serviceImplementation="com.wildanaizzaddin.ddltracker.service.DDLHistoryService"/>
+
         <toolWindow
             id="DDL Tracker"
             anchor="bottom"

@@ -40,7 +40,7 @@ object DDLFilterService {
                 timestamp = LocalDateTime.now(),
                 user = System.getProperty("user.name") ?: "unknown",
                 datasource = datasource,
-                schema = schema,
+                schema = schema.replace(Regex("[\\[\\]]"), ""),
                 objectName = objectName,
                 actionType = actionType
             )

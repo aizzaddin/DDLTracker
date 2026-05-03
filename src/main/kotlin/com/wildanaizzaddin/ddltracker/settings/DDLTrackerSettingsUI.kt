@@ -99,14 +99,23 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
     private fun refreshDatasources() {
         val saved = settings().trackedDatasources
             .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-        val names = runCatching {
-            LocalDataSourceManager.getInstance(project).dataSources.map { it.name }.sorted()
+        val items = runCatching {
+            LocalDataSourceManager.getInstance(project).dataSources.mapNotNull { ds ->
+                val hp = extractHostPort(ds.url ?: return@mapNotNull null) ?: return@mapNotNull null
+                hp to "${ds.name} — $hp"
+            }.sortedBy { it.second }
         }.getOrDefault(emptyList())
         datasourceList.clear()
-        for (name in names) {
-            datasourceList.addItem(name, name, name in saved)
+        for ((key, label) in items) {
+            datasourceList.addItem(key, label, key in saved)
         }
     }
+
+    private fun extractHostPort(jdbcUrl: String): String? = try {
+        val uri = java.net.URI(jdbcUrl.removePrefix("jdbc:"))
+        if (uri.host != null && uri.port != -1) "${uri.host}:${uri.port}"
+        else uri.host
+    } catch (_: Exception) { null }
 
     private fun selectedDatasources(): String {
         val selected = mutableListOf<String>()

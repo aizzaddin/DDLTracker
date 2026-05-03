@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import com.wildanaizzaddin.ddltracker.model.DDLChange
+import com.wildanaizzaddin.ddltracker.service.DDLHistoryService
 import java.awt.BorderLayout
 import javax.swing.*
 import javax.swing.table.AbstractTableModel
@@ -31,12 +32,11 @@ class DDLTrackerToolWindow(private val project: Project) {
             sqlPreview.caretPosition = 0
         }
         INSTANCE_MAP[project] = this
-        // Flush any changes that arrived before the window was opened
-        val pending = PENDING[project]
-        if (!pending.isNullOrEmpty()) {
-            changes.addAll(pending)
+
+        val history = runCatching { DDLHistoryService.getInstance(project).getAll() }.getOrDefault(emptyList())
+        if (history.isNotEmpty()) {
+            changes.addAll(history)
             tableModel.fireTableDataChanged()
-            PENDING.remove(project)
         }
     }
 
@@ -84,16 +84,11 @@ class DDLTrackerToolWindow(private val project: Project) {
 
     companion object {
         private val INSTANCE_MAP = mutableMapOf<Project, DDLTrackerToolWindow>()
-        private val PENDING = mutableMapOf<Project, MutableList<DDLChange>>()
 
         fun addChange(project: Project, change: DDLChange) {
+            runCatching { DDLHistoryService.getInstance(project).add(change) }
             ApplicationManager.getApplication().invokeLater {
-                val instance = INSTANCE_MAP[project]
-                if (instance != null) {
-                    instance.addChange(change)
-                } else {
-                    PENDING.getOrPut(project) { mutableListOf() }.add(0, change)
-                }
+                INSTANCE_MAP[project]?.addChange(change)
             }
         }
 

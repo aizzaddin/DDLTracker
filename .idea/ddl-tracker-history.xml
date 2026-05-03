@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DDLTrackerHistory">
+    <option name="entries">
+      <list>
+        <Entry>
+          <option name="actionType" value="CREATE_TABLE" />
+          <option name="commitStatus" value="COMMITTED" />
+          <option name="datasource" value="43.156.27.134:31214" />
+          <option name="objectName" value="USER_ACCOUNT(" />
+          <option name="schema" value="APP.PUBLIC" />
+          <option name="sql" value="create table user_account( id uuid primary key, user_name varchar, email varchar, password varchar, age numeric, created_at timestamp, created_by timestamp )" />
+          <option name="timestamp" value="2026-05-03T21:58:13.424544" />
+          <option name="user" value="wildanaizzaddin" />
+        </Entry>
+        <Entry>
+          <option name="actionType" value="ALTER_TABLE" />
+          <option name="commitStatus" value="COMMITTED" />
+          <option name="datasource" value="43.156.27.134:31214" />
+          <option name="objectName" value="TEST_PLUGIN" />
+          <option name="schema" value="APP" />
+          <option name="sql" value="alter table test_plugin drop column created_by" />
+          <option name="timestamp" value="2026-05-03T21:57:00.273129" />
+          <option name="user" value="wildanaizzaddin" />
+        </Entry>
+      </list>
+    </option>
+  </component>
+</project>
