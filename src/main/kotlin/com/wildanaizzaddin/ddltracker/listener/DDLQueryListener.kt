@@ -20,6 +20,10 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
 
     override fun afterStatement(context: DataRequest.Context) {
         val sql = context.getStatementContext()?.sql ?: context.query
+
+        // [DEBUG] Remove after confirmed working
+        notify("afterStatement fired: $sql", NotificationType.WARNING)
+
         if (!DDLFilterService.isDDL(sql)) return
 
         val settings = DDLTrackerSettings.getInstance()
@@ -54,17 +58,16 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
         }
     }
 
-    private fun notifySuccess(message: String, branch: String) {
+    private fun notify(msg: String, type: NotificationType) {
         NotificationGroupManager.getInstance()
             .getNotificationGroup("DDL Tracker")
-            .createNotification("Committed to $branch\n$message", NotificationType.INFORMATION)
+            .createNotification(msg, type)
             .notify(project)
     }
 
-    private fun notifyPushFailure(err: Throwable) {
-        NotificationGroupManager.getInstance()
-            .getNotificationGroup("DDL Tracker")
-            .createNotification("DDL Tracker: push failed — ${err.message}", NotificationType.WARNING)
-            .notify(project)
-    }
+    private fun notifySuccess(message: String, branch: String) =
+        notify("Committed to $branch\n$message", NotificationType.INFORMATION)
+
+    private fun notifyPushFailure(err: Throwable) =
+        notify("Push failed — ${err.message}", NotificationType.WARNING)
 }

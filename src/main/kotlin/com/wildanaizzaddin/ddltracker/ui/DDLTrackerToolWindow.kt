@@ -31,6 +31,13 @@ class DDLTrackerToolWindow(private val project: Project) {
             sqlPreview.caretPosition = 0
         }
         INSTANCE_MAP[project] = this
+        // Flush any changes that arrived before the window was opened
+        val pending = PENDING[project]
+        if (!pending.isNullOrEmpty()) {
+            changes.addAll(pending)
+            tableModel.fireTableDataChanged()
+            PENDING.remove(project)
+        }
     }
 
     private fun buildPanel(): JComponent {
@@ -77,10 +84,16 @@ class DDLTrackerToolWindow(private val project: Project) {
 
     companion object {
         private val INSTANCE_MAP = mutableMapOf<Project, DDLTrackerToolWindow>()
+        private val PENDING = mutableMapOf<Project, MutableList<DDLChange>>()
 
         fun addChange(project: Project, change: DDLChange) {
             ApplicationManager.getApplication().invokeLater {
-                INSTANCE_MAP[project]?.addChange(change)
+                val instance = INSTANCE_MAP[project]
+                if (instance != null) {
+                    instance.addChange(change)
+                } else {
+                    PENDING.getOrPut(project) { mutableListOf() }.add(0, change)
+                }
             }
         }
 
