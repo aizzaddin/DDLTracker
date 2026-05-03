@@ -1,0 +1,7 @@
+-- DDL Change Tracker
+-- Timestamp  : 2026-05-03T19:57:01
+-- User       : wildanaizzaddin
+-- Datasource : DB App
+-- Schema     : [APP]
+
+alter table test_plugin add version integer
