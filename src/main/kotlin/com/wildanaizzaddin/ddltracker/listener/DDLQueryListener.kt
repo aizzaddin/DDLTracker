@@ -30,6 +30,12 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
         val datasource = context.request.owner.getDisplayName()
         val activeSchema = context.searchPath?.getDisplayName() ?: ""
 
+        val tracked = settings.state.trackedDatasources
+        if (tracked.isNotBlank()) {
+            val trackedList = tracked.split(',').map { it.trim() }
+            if (datasource !in trackedList) return
+        }
+
         val excluded = settings.state.excludedSchemas.split(',').map { it.trim().uppercase() }
         val change = DDLFilterService.parse(sql, datasource, activeSchema) ?: return
         if (change.schema in excluded) return

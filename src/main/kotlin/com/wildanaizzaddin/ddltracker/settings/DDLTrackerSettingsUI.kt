@@ -1,15 +1,22 @@
 package com.wildanaizzaddin.ddltracker.settings
 
+import com.intellij.database.dataSource.LocalDataSourceManager
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.ui.CheckBoxList
 import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
+import java.awt.BorderLayout
+import java.awt.Dimension
+import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
 
-class DDLTrackerSettingsUI : Configurable {
+class DDLTrackerSettingsUI(private val project: Project) : Configurable {
 
     private val repoPathField = TextFieldWithBrowseButton().apply {
         addBrowseFolderListener(
@@ -21,22 +28,33 @@ class DDLTrackerSettingsUI : Configurable {
     private val branchField = JBTextField()
     private val autoCommitBox = JBCheckBox("Auto-commit on DDL")
     private val autoPushBox = JBCheckBox("Auto-push after commit")
-    private val trackAllBox = JBCheckBox("Track all datasources")
     private val excludedSchemasField = JBTextField()
+    private val datasourceList = CheckBoxList<String>()
 
     private var panel: JPanel? = null
 
     override fun getDisplayName() = "DDL Change Tracker"
 
     override fun createComponent(): JComponent {
+        val refreshBtn = JButton("Refresh").apply {
+            addActionListener { refreshDatasources() }
+        }
+        val datasourcePanel = JPanel(BorderLayout(0, 4)).apply {
+            add(refreshBtn, BorderLayout.NORTH)
+            add(JBScrollPane(datasourceList).apply {
+                preferredSize = Dimension(0, 130)
+            }, BorderLayout.CENTER)
+        }
+
         panel = FormBuilder.createFormBuilder()
             .addLabeledComponent("Git repository path:", repoPathField)
             .addLabeledComponent("Remote URL:", remoteUrlField)
             .addLabeledComponent("Active branch:", branchField)
             .addComponent(autoCommitBox)
             .addComponent(autoPushBox)
-            .addComponent(trackAllBox)
             .addLabeledComponent("Excluded schemas:", excludedSchemasField)
+            .addSeparator()
+            .addLabeledComponent("<html>Tracked datasources<br>(none = track all):</html>", datasourcePanel)
             .addComponentFillVertically(JPanel(), 0)
             .panel
         reset()
@@ -50,8 +68,8 @@ class DDLTrackerSettingsUI : Configurable {
             branchField.text != s.activeBranch ||
             autoCommitBox.isSelected != s.autoCommit ||
             autoPushBox.isSelected != s.autoPush ||
-            trackAllBox.isSelected != s.trackAllDatasources ||
-            excludedSchemasField.text != s.excludedSchemas
+            excludedSchemasField.text != s.excludedSchemas ||
+            selectedDatasources() != s.trackedDatasources
     }
 
     override fun apply() {
@@ -61,8 +79,8 @@ class DDLTrackerSettingsUI : Configurable {
             activeBranch = branchField.text.trim()
             autoCommit = autoCommitBox.isSelected
             autoPush = autoPushBox.isSelected
-            trackAllDatasources = trackAllBox.isSelected
             excludedSchemas = excludedSchemasField.text.trim()
+            trackedDatasources = selectedDatasources()
         }
     }
 
@@ -73,9 +91,31 @@ class DDLTrackerSettingsUI : Configurable {
             branchField.text = s.activeBranch
             autoCommitBox.isSelected = s.autoCommit
             autoPushBox.isSelected = s.autoPush
-            trackAllBox.isSelected = s.trackAllDatasources
             excludedSchemasField.text = s.excludedSchemas
+            refreshDatasources()
         }
+    }
+
+    private fun refreshDatasources() {
+        val saved = settings().trackedDatasources
+            .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val names = runCatching {
+            LocalDataSourceManager.getInstance(project).dataSources.map { it.name }.sorted()
+        }.getOrDefault(emptyList())
+        datasourceList.clear()
+        for (name in names) {
+            datasourceList.addItem(name, name, name in saved)
+        }
+    }
+
+    private fun selectedDatasources(): String {
+        val selected = mutableListOf<String>()
+        for (i in 0 until datasourceList.model.size) {
+            if (datasourceList.isItemSelected(i)) {
+                datasourceList.getItemAt(i)?.let { selected.add(it) }
+            }
+        }
+        return selected.joinToString(",")
     }
 
     private fun settings() = DDLTrackerSettings.getInstance().state

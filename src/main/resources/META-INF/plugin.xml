@@ -17,7 +17,7 @@
         <postStartupActivity
             implementation="com.wildanaizzaddin.ddltracker.DDLTrackerPlugin"/>
 
-        <applicationConfigurable
+        <projectConfigurable
             parentId="tools"
             instance="com.wildanaizzaddin.ddltracker.settings.DDLTrackerSettingsUI"
             id="com.wildanaizzaddin.ddltracker.settings"

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DDLTrackerSettings">
+    <option name="activeBranch" value="db_log" />
+    <option name="autoPush" value="true" />
+    <option name="remoteUrl" value="https://github.com/aizzaddin/DDLTracker.git" />
+    <option name="repoPath" value="$PROJECT_DIR$/../DDLTrackerClone" />
+    <option name="trackedDatasources" value="zeabur@43.156.27.134" />
+  </component>
+</project>
