@@ -103,9 +103,10 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
             .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         val items = runCatching {
-            LocalDataSourceManager.getInstance(project).dataSources.mapNotNull { ds ->
-                val hp = hostPortFromJdbcUrl(ds.url ?: return@mapNotNull null) ?: return@mapNotNull null
-                hp to "${ds.name} — $hp"
+            LocalDataSourceManager.getInstance(project).dataSources.map { ds ->
+                val hp = hostPortFromJdbcUrl(ds.url ?: "")
+                val label = if (hp != null) "${ds.name} — $hp" else ds.name
+                ds.name to label
             }.sortedBy { it.second }
         }.getOrDefault(emptyList())
 
