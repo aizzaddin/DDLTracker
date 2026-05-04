@@ -5,7 +5,6 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
-import com.intellij.ui.CheckBoxList
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
@@ -13,9 +12,7 @@ import com.intellij.util.ui.FormBuilder
 import com.wildanaizzaddin.ddltracker.service.hostPortFromJdbcUrl
 import java.awt.BorderLayout
 import java.awt.Dimension
-import javax.swing.JButton
-import javax.swing.JComponent
-import javax.swing.JPanel
+import javax.swing.*
 
 class DDLTrackerSettingsUI(private val project: Project) : Configurable {
 
@@ -31,8 +28,10 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
     private val autoPushBox = JBCheckBox("Auto-push after commit")
     private val excludedSchemasField = JBTextField()
 
-    private var datasourceList = CheckBoxList<String>()
-    private val datasourceScrollPane = JBScrollPane(datasourceList).apply {
+    // key (host:port) → JCheckBox
+    private val datasourceCheckboxes = mutableMapOf<String, JCheckBox>()
+    private val datasourceContainer = JPanel().apply { layout = BoxLayout(this, BoxLayout.Y_AXIS) }
+    private val datasourceScrollPane = JBScrollPane(datasourceContainer).apply {
         preferredSize = Dimension(0, 130)
     }
 
@@ -102,6 +101,7 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
     private fun refreshDatasources() {
         val saved = settings().trackedDatasources
             .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
         val items = runCatching {
             LocalDataSourceManager.getInstance(project).dataSources.mapNotNull { ds ->
                 val hp = hostPortFromJdbcUrl(ds.url ?: return@mapNotNull null) ?: return@mapNotNull null
@@ -109,23 +109,19 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
             }.sortedBy { it.second }
         }.getOrDefault(emptyList())
 
-        // Recreate the list fresh to avoid stale internal check-state map
-        datasourceList = CheckBoxList<String>()
-        datasourceScrollPane.setViewportView(datasourceList)
+        datasourceContainer.removeAll()
+        datasourceCheckboxes.clear()
         for ((key, label) in items) {
-            datasourceList.addItem(key, label, key in saved)
+            val cb = JCheckBox(label, key in saved)
+            datasourceCheckboxes[key] = cb
+            datasourceContainer.add(cb)
         }
+        datasourceContainer.revalidate()
+        datasourceContainer.repaint()
     }
 
-    private fun selectedDatasources(): String {
-        val selected = mutableListOf<String>()
-        for (i in 0 until datasourceList.model.size) {
-            if (datasourceList.isItemSelected(i)) {
-                datasourceList.getItemAt(i)?.let { selected.add(it) }
-            }
-        }
-        return selected.joinToString(",")
-    }
+    private fun selectedDatasources(): String =
+        datasourceCheckboxes.filter { (_, cb) -> cb.isSelected }.keys.joinToString(",")
 
     private fun settings() = DDLTrackerSettings.getInstance().state
 }
