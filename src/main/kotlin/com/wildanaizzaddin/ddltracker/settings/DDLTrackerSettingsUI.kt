@@ -1,6 +1,7 @@
 package com.wildanaizzaddin.ddltracker.settings
 
 import com.intellij.database.dataSource.LocalDataSourceManager
+import com.wildanaizzaddin.ddltracker.service.hostPortFromJdbcUrl
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
@@ -101,7 +102,7 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
             .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         val items = runCatching {
             LocalDataSourceManager.getInstance(project).dataSources.mapNotNull { ds ->
-                val hp = extractHostPort(ds.url ?: return@mapNotNull null) ?: return@mapNotNull null
+                val hp = hostPortFromJdbcUrl(ds.url ?: return@mapNotNull null) ?: return@mapNotNull null
                 hp to "${ds.name} — $hp"
             }.sortedBy { it.second }
         }.getOrDefault(emptyList())
@@ -110,12 +111,6 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
             datasourceList.addItem(key, label, key in saved)
         }
     }
-
-    private fun extractHostPort(jdbcUrl: String): String? = try {
-        val uri = java.net.URI(jdbcUrl.removePrefix("jdbc:"))
-        if (uri.host != null && uri.port != -1) "${uri.host}:${uri.port}"
-        else uri.host
-    } catch (_: Exception) { null }
 
     private fun selectedDatasources(): String {
         val selected = mutableListOf<String>()

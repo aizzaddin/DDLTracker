@@ -11,6 +11,7 @@ import com.wildanaizzaddin.ddltracker.service.DDLFilterService
 import com.wildanaizzaddin.ddltracker.service.DDLHistoryService
 import com.wildanaizzaddin.ddltracker.service.FileWriterService
 import com.wildanaizzaddin.ddltracker.service.GitCommitService
+import com.wildanaizzaddin.ddltracker.service.hostPortFromJdbcUrl
 import com.wildanaizzaddin.ddltracker.settings.DDLTrackerSettings
 import com.wildanaizzaddin.ddltracker.ui.DDLTrackerToolWindow
 import com.intellij.database.datagrid.DataAuditor
@@ -96,33 +97,28 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
                     javaClass.getDeclaredMethod(name).also { it.isAccessible = true }.invoke(this)
                 }.getOrNull()
 
-        fun Any.jdbcUrl(): String? =
-            (call0("getUrl") as? String)?.takeIf { it.isNotBlank() }
-
-        fun String.toHostPort(): String? = try {
-            val uri = java.net.URI(removePrefix("jdbc:"))
-            if (uri.host != null && uri.port != -1) "${uri.host}:${uri.port}" else uri.host
-        } catch (_: Exception) { null }
+        fun Any.resolvedHostPort(): String? =
+            (call0("getUrl") as? String)?.takeIf { it.isNotBlank() }?.let { hostPortFromJdbcUrl(it) }
 
         // Path 1: getLocalDataSource().getUrl()
-        owner.call0("getLocalDataSource")?.jdbcUrl()?.toHostPort()?.let { return it }
+        owner.call0("getLocalDataSource")?.resolvedHostPort()?.let { return it }
 
         // Path 2: getConnectionPoint().getDataSource().getUrl()
         owner.call0("getConnectionPoint")
-            ?.call0("getDataSource")?.jdbcUrl()?.toHostPort()?.let { return it }
+            ?.call0("getDataSource")?.resolvedHostPort()?.let { return it }
 
         // Path 3: getSession().getConnectionPoint().getDataSource().getUrl()
         owner.call0("getSession")
             ?.call0("getConnectionPoint")
-            ?.call0("getDataSource")?.jdbcUrl()?.toHostPort()?.let { return it }
+            ?.call0("getDataSource")?.resolvedHostPort()?.let { return it }
 
         // Path 4: getDataSource().getUrl()
-        owner.call0("getDataSource")?.jdbcUrl()?.toHostPort()?.let { return it }
+        owner.call0("getDataSource")?.resolvedHostPort()?.let { return it }
 
         // Path 5: getClient().getConnectionPoint().getDataSource().getUrl()
         owner.call0("getClient")
             ?.call0("getConnectionPoint")
-            ?.call0("getDataSource")?.jdbcUrl()?.toHostPort()?.let { return it }
+            ?.call0("getDataSource")?.resolvedHostPort()?.let { return it }
 
         val pub = owner.javaClass.methods
             .filter { it.parameterCount == 0 }
