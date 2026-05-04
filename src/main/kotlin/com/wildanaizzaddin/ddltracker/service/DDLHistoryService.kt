@@ -18,7 +18,8 @@ class DDLHistoryService : PersistentStateComponent<DDLHistoryService.State> {
         var schema: String = "",
         var objectName: String = "",
         var actionType: String = "",
-        var commitStatus: String = "PENDING"
+        var commitStatus: String = "PENDING",
+        var project: String = ""
     )
 
     data class State(var entries: MutableList<Entry> = mutableListOf())
@@ -42,11 +43,11 @@ class DDLHistoryService : PersistentStateComponent<DDLHistoryService.State> {
     fun getAll(): List<DDLChange> = myState.entries.mapNotNull { it.toChange() }
 
     private fun DDLChange.toEntry() =
-        Entry(sql, timestamp.toString(), user, datasource, schema, objectName, actionType, commitStatus.name)
+        Entry(sql, timestamp.toString(), user, datasource, schema, objectName, actionType, commitStatus.name, project)
 
     private fun Entry.toChange() = runCatching {
         DDLChange(sql, LocalDateTime.parse(timestamp), user, datasource, schema, objectName, actionType,
-            CommitStatus.valueOf(commitStatus))
+            CommitStatus.valueOf(commitStatus), project)
     }.getOrNull()
 
     companion object {

@@ -23,6 +23,7 @@ object FileWriterService {
         appendLine("-- User       : ${change.user}")
         appendLine("-- Datasource : ${change.datasource}")
         appendLine("-- Schema     : ${change.schema}")
+        if (change.project.isNotBlank()) appendLine("-- Project    : ${change.project}")
         appendLine()
         append(change.sql)
     }

@@ -14,6 +14,7 @@ import com.wildanaizzaddin.ddltracker.service.GitCommitService
 import com.wildanaizzaddin.ddltracker.service.hostPortFromJdbcUrl
 import com.wildanaizzaddin.ddltracker.settings.DDLTrackerSettings
 import com.wildanaizzaddin.ddltracker.ui.DDLTrackerToolWindow
+import com.wildanaizzaddin.ddltracker.ui.ProjectInputDialog
 import com.intellij.database.datagrid.DataAuditor
 import com.intellij.database.datagrid.DataRequest
 import java.util.Collections
@@ -66,24 +67,35 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
             return
         }
 
-        ApplicationManager.getApplication().executeOnPooledThread {
-            runCatching {
-                val file = FileWriterService.write(change, settings.state.repoPath)
-                GitCommitService(settings).commitAndPush(change, file)
-                    .onSuccess { message ->
-                        change.commitStatus = CommitStatus.COMMITTED
-                        runCatching { DDLHistoryService.getInstance(project).updateStatus(change) }
-                        DDLTrackerToolWindow.refresh(project)
-                        notifySuccess(message, settings.state.activeBranch)
-                    }
-                    .onFailure { err ->
-                        change.commitStatus = CommitStatus.FAILED
-                        runCatching { DDLHistoryService.getInstance(project).updateStatus(change) }
-                        DDLTrackerToolWindow.refresh(project)
-                        notifyPushFailure(err)
-                    }
-            }.onFailure { err ->
-                LOG.error("[DDL Tracker] unexpected error processing statement", err)
+        val repoPath = settings.state.repoPath
+        val activeBranch = settings.state.activeBranch
+        ApplicationManager.getApplication().invokeLater {
+            val dialog = ProjectInputDialog(project, change)
+            if (!dialog.showAndGet()) return@invokeLater
+
+            val projectName = dialog.getProjectName()
+            change.project = projectName
+            if (projectName.isNotBlank()) saveRecentProject(projectName, settings)
+
+            ApplicationManager.getApplication().executeOnPooledThread {
+                runCatching {
+                    val file = FileWriterService.write(change, repoPath)
+                    GitCommitService(settings).commitAndPush(change, file)
+                        .onSuccess { message ->
+                            change.commitStatus = CommitStatus.COMMITTED
+                            runCatching { DDLHistoryService.getInstance(project).updateStatus(change) }
+                            DDLTrackerToolWindow.refresh(project)
+                            notifySuccess(message, activeBranch)
+                        }
+                        .onFailure { err ->
+                            change.commitStatus = CommitStatus.FAILED
+                            runCatching { DDLHistoryService.getInstance(project).updateStatus(change) }
+                            DDLTrackerToolWindow.refresh(project)
+                            notifyPushFailure(err)
+                        }
+                }.onFailure { err ->
+                    LOG.error("[DDL Tracker] unexpected error processing statement", err)
+                }
             }
         }
     }
@@ -130,6 +142,14 @@ class DDLQueryListener(private val project: Project) : DataAuditor {
             .sorted()
         LOG.warn("[DDL Tracker] resolveDatasourceName fallback\n  class : ${owner.javaClass.name}\n  public: $pub\n  decl  : $decl")
         return owner.getDisplayName()
+    }
+
+    private fun saveRecentProject(name: String, settings: DDLTrackerSettings) {
+        val list = settings.state.recentProjects
+            .split(',').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        list.remove(name)
+        list.add(0, name)
+        settings.state.recentProjects = list.take(10).joinToString(",")
     }
 
     private fun notify(msg: String, type: NotificationType) {

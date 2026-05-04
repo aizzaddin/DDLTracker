@@ -12,5 +12,6 @@ data class DDLChange(
     val schema: String,
     val objectName: String,
     val actionType: String,
-    var commitStatus: CommitStatus = CommitStatus.PENDING
+    var commitStatus: CommitStatus = CommitStatus.PENDING,
+    var project: String = ""
 )

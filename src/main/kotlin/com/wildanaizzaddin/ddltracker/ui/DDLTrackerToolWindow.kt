@@ -61,7 +61,7 @@ class DDLTrackerToolWindow(private val project: Project) {
     }
 
     private inner class ChangeTableModel : AbstractTableModel() {
-        private val columns = arrayOf("Timestamp", "User", "Datasource", "Schema", "Action Type", "Object", "Status")
+        private val columns = arrayOf("Timestamp", "User", "Datasource", "Schema", "Action Type", "Object", "Project", "Status")
 
         override fun getColumnCount() = columns.size
         override fun getRowCount() = changes.size
@@ -76,7 +76,8 @@ class DDLTrackerToolWindow(private val project: Project) {
                 3 -> c.schema
                 4 -> c.actionType
                 5 -> c.objectName
-                6 -> c.commitStatus.name
+                6 -> c.project
+                7 -> c.commitStatus.name
                 else -> ""
             }
         }

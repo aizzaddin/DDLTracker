@@ -16,7 +16,8 @@ class DDLTrackerSettings : PersistentStateComponent<DDLTrackerSettings.State> {
         var autoCommit: Boolean = true,
         var autoPush: Boolean = false,
         var excludedSchemas: String = "SYS,SYSTEM,DBSNMP",
-        var trackedDatasources: String = ""
+        var trackedDatasources: String = "",
+        var recentProjects: String = ""
     )
 
     private var myState = State()

@@ -1,7 +1,6 @@
 package com.wildanaizzaddin.ddltracker.settings
 
 import com.intellij.database.dataSource.LocalDataSourceManager
-import com.wildanaizzaddin.ddltracker.service.hostPortFromJdbcUrl
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
@@ -11,6 +10,7 @@ import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
+import com.wildanaizzaddin.ddltracker.service.hostPortFromJdbcUrl
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JButton
@@ -30,7 +30,11 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
     private val autoCommitBox = JBCheckBox("Auto-commit on DDL")
     private val autoPushBox = JBCheckBox("Auto-push after commit")
     private val excludedSchemasField = JBTextField()
-    private val datasourceList = CheckBoxList<String>()
+
+    private var datasourceList = CheckBoxList<String>()
+    private val datasourceScrollPane = JBScrollPane(datasourceList).apply {
+        preferredSize = Dimension(0, 130)
+    }
 
     private var panel: JPanel? = null
 
@@ -42,9 +46,7 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
         }
         val datasourcePanel = JPanel(BorderLayout(0, 4)).apply {
             add(refreshBtn, BorderLayout.NORTH)
-            add(JBScrollPane(datasourceList).apply {
-                preferredSize = Dimension(0, 130)
-            }, BorderLayout.CENTER)
+            add(datasourceScrollPane, BorderLayout.CENTER)
         }
 
         panel = FormBuilder.createFormBuilder()
@@ -106,7 +108,10 @@ class DDLTrackerSettingsUI(private val project: Project) : Configurable {
                 hp to "${ds.name} — $hp"
             }.sortedBy { it.second }
         }.getOrDefault(emptyList())
-        datasourceList.clear()
+
+        // Recreate the list fresh to avoid stale internal check-state map
+        datasourceList = CheckBoxList<String>()
+        datasourceScrollPane.setViewportView(datasourceList)
         for ((key, label) in items) {
             datasourceList.addItem(key, label, key in saved)
         }

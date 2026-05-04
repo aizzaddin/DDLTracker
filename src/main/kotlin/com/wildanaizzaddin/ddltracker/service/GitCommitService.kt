@@ -72,6 +72,8 @@ class GitCommitService(private val settings: DDLTrackerSettings) {
         }
     }
 
-    private fun commitMessage(c: DDLChange) =
-        "[${c.actionType.replace('_', ' ')}] ${c.schema}.${c.objectName} — ${c.user} @ ${c.timestamp}"
+    private fun commitMessage(c: DDLChange): String {
+        val base = "[${c.actionType.replace('_', ' ')}] ${c.schema}.${c.objectName} — ${c.user} @ ${c.timestamp}"
+        return if (c.project.isNotBlank()) "$base | ${c.project}" else base
+    }
 }
